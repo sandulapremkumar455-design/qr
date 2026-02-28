@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Students — Smart Attendance System{% endblock %}
+{% block page_title %}Student Management{% endblock %}
+{% block topbar_actions %}
+  <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-modal').classList.add('open')">
+    <i class="fas fa-user-plus"></i> Add Student
+  </button>
+{% endblock %}
+
+{% block content %}
+
+<!-- FILTER BAR -->
+<form method="GET" action="{{ url_for('student_info') }}">
+  <div class="filter-bar" style="margin-bottom:20px;">
+    <div class="form-group">
+      <label class="form-label">SEARCH</label>
+      <input type="text" name="search" class="form-control" placeholder="Name or PIN..." value="{{ search }}"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">YEAR</label>
+      <select name="year" class="form-control">
+        <option value="">All Years</option>
+        <option {% if year == '1st Year' %}selected{% endif %}>1st Year</option>
+        <option {% if year == '2nd Year' %}selected{% endif %}>2nd Year</option>
+        <option {% if year == '3rd Year' %}selected{% endif %}>3rd Year</option>
+        <option {% if year == '4th Year' %}selected{% endif %}>4th Year</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">BRANCH</label>
+      <select name="branch" class="form-control">
+        <option value="">All</option>
+        <option {% if branch == 'CS' %}selected{% endif %}>CS</option>
+        <option {% if branch == 'IT' %}selected{% endif %}>IT</option>
+        <option {% if branch == 'EC' %}selected{% endif %}>EC</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+    <a href="{{ url_for('student_info') }}" class="btn btn-ghost"><i class="fas fa-rotate-left"></i></a>
+  </div>
+</form>
+
+<!-- BATCH SUMMARY OVERVIEW -->
+{% if batch_summary %}
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+  {% for batch_key, bdata in batch_summary.items() %}
+  <div style="padding:14px 18px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);min-width:180px;flex:1;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:{% if bdata.avg_pct >= 75 %}linear-gradient(90deg,var(--teal),transparent){% elif bdata.avg_pct >= 60 %}linear-gradient(90deg,var(--amber),transparent){% else %}linear-gradient(90deg,var(--red),transparent){% endif %}"></div>
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:12px;margin-bottom:8px;">{{ batch_key }}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:30px;color:{% if bdata.avg_pct >= 75 %}var(--teal){% elif bdata.avg_pct >= 60 %}var(--amber){% else %}var(--red){% endif %}">{{ bdata.avg_pct }}%</span>
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);">avg</span>
+    </div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);margin-top:2px;">{{ bdata.count }} students</div>
+    {% if bdata.below75 > 0 %}
+    <div style="margin-top:6px;font-family:'Space Mono',monospace;font-size:10px;color:var(--red);">
+      <i class="fas fa-triangle-exclamation"></i> {{ bdata.below75 }} below 75%
+    </div>
+    {% else %}
+    <div style="margin-top:6px;font-family:'Space Mono',monospace;font-size:10px;color:var(--teal);">
+      <i class="fas fa-circle-check"></i> All on track
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- TABLE -->
+<div class="card">
+  <div class="card-body" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>STUDENT</th>
+            <th>PIN</th>
+            <th>BATCH</th>
+            <th>ATTENDED</th>
+            <th>TOTAL</th>
+            <th>PERCENTAGE</th>
+            <th>STATUS</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in students %}
+          {% set s = item.user %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <!-- Student face photo (shown if available, else avatar) -->
+                <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2px solid var(--border2);flex-shrink:0;background:var(--bg3);cursor:pointer"
+                     onclick="showStudentPhoto({{ s.id }}, '{{ s.name }}')"
+                     title="Click to view full photo">
+                  {% if s.face_image %}
+                    <img src="data:image/jpeg;base64,{{ s.face_image }}"
+                         style="width:100%;height:100%;object-fit:cover" alt="{{ s.name }}"/>
+                  {% else %}
+                    <div class="avatar" style="width:44px;height:44px;font-size:14px;margin:0;border-radius:50%;
+                      background:linear-gradient(135deg,
+                        {% if item.pct >= 75 %}var(--teal),var(--teal-d)
+                        {% elif item.pct >= 60 %}var(--amber),var(--amber-d)
+                        {% else %}var(--red),var(--red-d){% endif %});">
+                      {{ s.name[0].upper() }}
+                    </div>
+                  {% endif %}
+                </div>
+                <div>
+                  <a href="{{ url_for('student_attendance_detail', uid=s.id) }}"
+                     style="font-weight:500;font-size:13px;color:var(--text);text-decoration:none;hover:color:var(--accent-h)"
+                     onmouseover="this.style.color='var(--accent-h)'" onmouseout="this.style.color='var(--text)'">{{ s.name }}</a>
+                  <div class="text-xs text-muted">Last login: {{ s.last_login.strftime('%d %b %H:%M') if s.last_login else 'Never' }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge badge-neutral font-mono">{{ s.pin }}</span></td>
+            <td class="text-sm text-muted">{{ s.year }} · {{ s.branch }}</td>
+            <td style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--teal);">{{ item.attended }}</td>
+            <td style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text2);">{{ item.total }}</td>
+            <td style="min-width:120px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-family:'Syne',sans-serif;font-weight:700;color:
+                  {{ 'var(--teal)' if item.pct >= 75 else ('var(--amber)' if item.pct >= 60 else 'var(--red)') }}">
+                  {{ item.pct }}%
+                </span>
+                <div class="progress-bar" style="flex:1;">
+                  <div class="progress-fill {{ 'good' if item.pct >= 75 else ('warning' if item.pct >= 60 else 'danger') }}"
+                       data-pct="{{ item.pct }}" style="width:0%"></div>
+                </div>
+              </div>
+            </td>
+            <td>
+              {% if s.is_suspended %}
+                <span class="badge badge-danger">SUSPENDED</span>
+              {% elif not s.is_active %}
+                <span class="badge badge-neutral">INACTIVE</span>
+              {% else %}
+                <span class="badge badge-teal">ACTIVE</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <form method="POST" action="{{ url_for('toggle_suspend', uid=s.id) }}" style="display:inline;">
+                  <button type="submit" class="btn btn-ghost btn-icon btn-sm"
+                          data-tip="{{ 'Unsuspend' if s.is_suspended else 'Suspend' }}"
+                          onclick="return confirm('{{ 'Unsuspend' if s.is_suspended else 'Suspend' }} {{ s.name }}?')">
+                    <i class="fas fa-{{ 'lock-open' if s.is_suspended else 'lock' }}"
+                       style="color:{{ 'var(--teal)' if s.is_suspended else 'var(--amber)' }}"></i>
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('delete_student', uid=s.id) }}" style="display:inline;">
+                  <button type="submit" class="btn btn-ghost btn-icon btn-sm"
+                          data-tip="Delete"
+                          onclick="return confirm('Permanently delete {{ s.name }}? This cannot be undone.')">
+                    <i class="fas fa-trash" style="color:var(--red)"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="empty-state"><i class="fas fa-users-slash"></i><p>No students found.</p></div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if students %}
+  <div class="card-footer text-muted text-sm">
+    Showing {{ students|length }} student{{ 's' if students|length != 1 else '' }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ADD STUDENT MODAL -->
+<div class="modal-backdrop" id="add-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-user-plus" style="color:var(--teal);margin-right:10px"></i>Add New Student</div>
+    <form method="POST" action="{{ url_for('admin_add_student') }}">
+      <div class="form-group">
+        <label class="form-label">FULL NAME</label>
+        <input type="text" name="name" class="form-control" placeholder="Student's full name" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">PIN / ROLL NUMBER</label>
+          <input type="text" name="pin" class="form-control" placeholder="e.g. 23005-CS-055" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PASSWORD</label>
+          <input type="password" name="password" class="form-control" placeholder="Temporary password" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">YEAR</label>
+          <select name="year" class="form-control" required>
+            <option value="">Select</option>
+            <option>1st Year</option>
+            <option>2nd Year</option>
+            <option>3rd Year</option>
+            <option>4th Year</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">BRANCH</label>
+          <select name="branch" class="form-control" required>
+            <option value="">Select</option>
+            <option>CS</option>
+            <option>IT</option>
+            <option>EC</option>
+            <option>ME</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('add-modal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-teal" style="flex:1">
+          <i class="fas fa-plus"></i> Add Student
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- STUDENT PHOTO MODAL -->
+<div id="photo-modal" onclick="if(event.target===this)this.style.display='none'"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--border2);border-radius:var(--r-xl);padding:28px;max-width:340px;width:90%;text-align:center">
+    <div id="photo-modal-name" style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:14px"></div>
+    <div style="width:240px;height:240px;border-radius:50%;overflow:hidden;margin:0 auto 16px;border:3px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center">
+      <img id="photo-modal-img" src="" style="width:100%;height:100%;object-fit:cover;display:none" alt=""/>
+      <div id="photo-modal-none" style="color:var(--text3);font-family:'Space Mono',monospace;font-size:11px;text-align:center;padding:20px">No photo<br>registered</div>
+    </div>
+    <button class="btn btn-ghost" onclick="document.getElementById('photo-modal').style.display='none'">
+      <i class="fas fa-times"></i> Close
+    </button>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.progress-fill').forEach(function(el){
+  setTimeout(function(){el.style.width=el.dataset.pct+'%'},100);
+});
+function showStudentPhoto(uid,name){
+  var modal=document.getElementById('photo-modal');
+  var img=document.getElementById('photo-modal-img');
+  var none=document.getElementById('photo-modal-none');
+  document.getElementById('photo-modal-name').textContent=name;
+  modal.style.display='flex';
+  img.style.display='none';img.src='';none.style.display='flex';
+  fetch('/api/admin/student_face/'+uid)
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.success&&d.image){img.src='data:image/jpeg;base64,'+d.image;img.style.display='block';none.style.display='none';}
+  }).catch(function(){});
+}
+</script>
+
+{% endblock %}

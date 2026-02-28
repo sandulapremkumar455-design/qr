@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Register — Smart Attendance System{% endblock %}
+
+{% block auth_content %}
+<style>
+.reg-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;position:relative}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:0.2;pointer-events:none;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 80%)}
+.reg-box{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--border2);border-radius:var(--r-xl);padding:40px;box-shadow:var(--shadow-lg);animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1)}
+.steps-bar{display:flex;gap:0;margin-bottom:32px;border-radius:var(--r-md);overflow:hidden;border:1px solid var(--border)}
+.step-item{flex:1;padding:10px 8px;text-align:center;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text3);background:var(--bg3);transition:all 0.3s;border-right:1px solid var(--border)}
+.step-item:last-child{border-right:none}
+.step-item.active{background:rgba(108,99,255,0.15);color:var(--accent-h)}
+.step-item.done{background:rgba(0,212,170,0.1);color:var(--teal)}
+.mode-toggle{display:inline-flex;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-md);padding:4px;gap:4px;margin-bottom:16px}
+.mode-btn{padding:8px 18px;border:none;border-radius:var(--r-sm);font-family:'Syne',sans-serif;font-weight:600;font-size:12px;cursor:pointer;color:var(--text2);background:none;transition:all 0.2s}
+.mode-btn.active{background:var(--accent);color:#fff}
+/* Circle face display */
+.face-circle{width:200px;height:200px;border-radius:50%;overflow:hidden;margin:0 auto 14px;background:#000;border:3px solid var(--border2);position:relative;transition:border-color 0.3s}
+.face-circle.live{border-color:var(--accent);animation:facePulse 2s infinite}
+.face-circle.captured{border-color:var(--teal)}
+.face-circle.fail{border-color:var(--red)}
+@keyframes facePulse{0%,100%{box-shadow:0 0 0 0 rgba(108,99,255,0.4)}50%{box-shadow:0 0 0 10px rgba(108,99,255,0)}}
+.face-circle video,.face-circle img{width:100%;height:100%;object-fit:cover;display:block}
+.face-circle video{transform:scaleX(-1)}
+/* Upload zone */
+.upload-circle{width:200px;height:200px;border-radius:50%;border:3px dashed var(--border2);background:var(--bg3);margin:0 auto 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.25s;overflow:hidden;position:relative}
+.upload-circle:hover,.upload-circle.ready{border-color:var(--accent);background:rgba(108,99,255,0.05);border-style:solid}
+.upload-circle.ok{border-color:var(--teal);border-style:solid}
+.upload-circle.fail{border-color:var(--red);border-style:solid}
+#uc-img{width:100%;height:100%;object-fit:cover;display:none;position:absolute;inset:0}
+.uc-ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);text-align:center;padding:10px;pointer-events:none}
+.f-status{font-family:'Space Mono',monospace;font-size:11px;color:var(--text2);margin-bottom:14px;text-align:center;min-height:16px}
+</style>
+
+<script>
+(function(){
+  var s=document.createElement("script");
+  s.src="/static/face-api.min.js";
+  s.onerror=function(){var fb=document.createElement("script");fb.src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";document.head.appendChild(fb);};
+  document.head.appendChild(s);
+})();
+</script>
+
+<div class="grid-bg"></div>
+<div class="reg-wrap">
+  <div class="reg-box">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Smart Attendance</div>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-top:4px">Student Registration</div>
+    </div>
+
+    <div class="steps-bar">
+      <div class="step-item active" id="slbl1">1 · INFO</div>
+      <div class="step-item" id="slbl2">2 · FACE</div>
+      <div class="step-item" id="slbl3">3 · DONE</div>
+    </div>
+
+    <!-- STEP 1: Info -->
+    <div id="step1">
+      <div class="form-group">
+        <label class="form-label">FULL NAME</label>
+        <input type="text" id="r-name" class="form-control" placeholder="Your full name"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN / ROLL NUMBER</label>
+        <input type="text" id="r-pin" class="form-control" placeholder="e.g. 23005-CS-055"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">YEAR</label>
+          <select id="r-year" class="form-control">
+            <option value="">Select Year</option>
+            <option>1st Year</option><option>2nd Year</option>
+            <option>3rd Year</option><option>4th Year</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">BRANCH</label>
+          <select id="r-branch" class="form-control">
+            <option value="">Select Branch</option>
+            <option>CS</option><option>IT</option>
+            <option>EC</option><option>ME</option><option>CE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PASSWORD</label>
+        <input type="password" id="r-pw" class="form-control" placeholder="Create a strong password (min 6 chars)"/>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="goStep2()">
+        <i class="fas fa-arrow-right"></i> Next — Add Face Photo
+      </button>
+      <div style="text-align:center;margin-top:16px;font-size:13px;color:var(--text2)">
+        Already registered? <a href="{{ url_for('login') }}" style="color:var(--accent-h);text-decoration:none;font-weight:600">Sign in</a>
+      </div>
+    </div>
+
+    <!-- STEP 2: Face -->
+    <div id="step2" style="display:none;text-align:center">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">
+        <i class="fas fa-face-viewfinder" style="color:var(--accent)"></i> Add Your Face
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Use camera OR upload a photo — your face is your login key</div>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="r-btn-cam" onclick="rSwitchMode('camera')">
+          <i class="fas fa-camera"></i> Camera
+        </button>
+        <button class="mode-btn" id="r-btn-up" onclick="rSwitchMode('upload')">
+          <i class="fas fa-image"></i> Upload Photo
+        </button>
+      </div>
+
+      <!-- Camera -->
+      <div id="r-cam-view">
+        <div class="face-circle" id="r-face-circle">
+          <video id="r-video" autoplay muted playsinline></video>
+        </div>
+        <div class="f-status" id="r-cam-st">Starting camera...</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" id="r-cap-btn" onclick="rCapture()" disabled>
+            <i class="fas fa-camera"></i> Capture Face
+          </button>
+          <button class="btn btn-ghost" id="r-retake-cam" onclick="rRetakeCam()" style="display:none">
+            <i class="fas fa-rotate-left"></i> Retake
+          </button>
+        </div>
+      </div>
+
+      <!-- Upload -->
+      <div id="r-up-view" style="display:none">
+        <div class="upload-circle" id="r-up-zone" onclick="document.getElementById('r-file').click()">
+          <img id="uc-img" src="" alt="face"/>
+          <div class="uc-ph" id="r-up-ph">
+            <i class="fas fa-cloud-upload-alt" style="font-size:36px"></i>
+            <span style="font-size:11px;font-family:'Space Mono',monospace">Tap to choose<br>your photo</span>
+          </div>
+        </div>
+        <input type="file" id="r-file" accept="image/*" capture="user" style="display:none" onchange="rOnFile(event)"/>
+        <div class="f-status" id="r-up-st">Choose a clear front-facing photo</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" id="r-extract-btn" onclick="rExtractUpload()" disabled>
+            <i class="fas fa-face-smile"></i> Use This Photo
+          </button>
+          <button class="btn btn-ghost" id="r-retake-up" onclick="rRetakeUp()" style="display:none">
+            <i class="fas fa-rotate-left"></i> Choose Different
+          </button>
+        </div>
+      </div>
+
+      <canvas id="r-canvas" style="display:none"></canvas>
+
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn btn-ghost" onclick="goStep1()"><i class="fas fa-arrow-left"></i> Back</button>
+        <button class="btn btn-teal btn-full" id="r-submit-btn" onclick="submitReg()" disabled>
+          <i class="fas fa-user-plus"></i> Complete Registration
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Done -->
+    <div id="step3" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:64px;margin-bottom:16px">🎉</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:22px;margin-bottom:8px">Registered!</div>
+      <div style="color:var(--text2);font-size:14px;margin-bottom:24px">Your account and face are saved. You can now sign in.</div>
+      <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg"><i class="fas fa-right-to-bracket"></i> Go to Login</a>
+    </div>
+  </div>
+</div>
+
+<script>
+var regStream=null, faceDescriptor=null, modelsLoaded=false, regData={};
+
+function goStep2(){
+  var name=document.getElementById('r-name').value.trim();
+  var pin=document.getElementById('r-pin').value.trim();
+  var year=document.getElementById('r-year').value;
+  var branch=document.getElementById('r-branch').value;
+  var pw=document.getElementById('r-pw').value;
+  if(!name||!pin||!year||!branch||!pw){showToast('Fill all fields','error');return;}
+  if(pw.length<6){showToast('Password must be at least 6 characters','error');return;}
+  regData={name,pin,year,branch,password:pw};
+  document.getElementById('step1').style.display='none';
+  document.getElementById('step2').style.display='block';
+  document.getElementById('slbl1').className='step-item done';
+  document.getElementById('slbl2').className='step-item active';
+  if(!modelsLoaded) loadFaceModels();
+  rSwitchMode('camera');
+}
+
+function goStep1(){
+  stopRegCam();
+  document.getElementById('step2').style.display='none';
+  document.getElementById('step1').style.display='block';
+  document.getElementById('slbl1').className='step-item active';
+  document.getElementById('slbl2').className='step-item';
+}
+
+function rSwitchMode(mode){
+  var isCam=mode==='camera';
+  document.getElementById('r-btn-cam').classList.toggle('active',isCam);
+  document.getElementById('r-btn-up').classList.toggle('active',!isCam);
+  document.getElementById('r-cam-view').style.display=isCam?'block':'none';
+  document.getElementById('r-up-view').style.display=isCam?'none':'block';
+  if(isCam){startRegCam();}else{stopRegCam();}
+}
+
+async function loadFaceModels(){
+  rSt('cam','Loading AI face models...');rSt('up','Loading AI face models...');
+  try{
+    var U='/static/weights';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(U);
+    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(U);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(U);
+    modelsLoaded=true;
+    rSt('cam','Look at camera and click Capture Face');
+    rSt('up','Select a photo');
+    document.getElementById('r-cap-btn').disabled=false;
+  }catch(e){rSt('cam','Model load failed — check internet');rSt('up','Model load failed');}
+}
+
+function startRegCam(){
+  if(regStream) return;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:640}}})
+  .then(function(s){
+    regStream=s;
+    document.getElementById('r-video').srcObject=s;
+    document.getElementById('r-face-circle').classList.add('live');
+    if(modelsLoaded){document.getElementById('r-cap-btn').disabled=false;rSt('cam','Look at camera and click Capture Face');}
+    else rSt('cam','Loading models...');
+  })
+  .catch(function(){
+    rSt('cam','Camera blocked — switching to upload mode');
+    setTimeout(function(){rSwitchMode('upload');},1200);
+  });
+}
+function stopRegCam(){
+  if(regStream){regStream.getTracks().forEach(function(t){t.stop()});regStream=null;}
+}
+
+async function rCapture(){
+  if(!modelsLoaded){rSt('cam','Still loading models...');return;}
+  var btn=document.getElementById('r-cap-btn');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Processing...';
+  rSt('cam','Detecting face...');
+  var video=document.getElementById('r-video');
+  var canvas=document.getElementById('r-canvas');
+  canvas.width=video.videoWidth||320;canvas.height=video.videoHeight||320;
+  canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+  var desc=await detectFace(canvas);
+  if(!desc){
+    document.getElementById('r-face-circle').className='face-circle live fail';
+    rSt('cam','❌ No face detected — look directly and try again');
+    setTimeout(function(){document.getElementById('r-face-circle').className='face-circle live';btn.disabled=false;btn.innerHTML='<i class="fas fa-camera"></i> Capture Face';},2000);
+    return;
+  }
+  faceDescriptor=desc;
+  // Show still frame
+  var img=new Image();img.src=canvas.toDataURL('image/jpeg',0.85);
+  img.style.cssText='width:100%;height:100%;object-fit:cover;transform:scaleX(-1)';
+  var circle=document.getElementById('r-face-circle');
+  circle.innerHTML='';circle.appendChild(img);circle.className='face-circle captured';
+  rSt('cam','✓ Face captured!');
+  btn.style.display='none';
+  document.getElementById('r-retake-cam').style.display='inline-flex';
+  document.getElementById('r-submit-btn').disabled=false;
+  showToast('Face captured! ✓','success');
+  stopRegCam();
+}
+
+function rRetakeCam(){
+  faceDescriptor=null;
+  document.getElementById('r-submit-btn').disabled=true;
+  var circle=document.getElementById('r-face-circle');
+  circle.innerHTML='<video id="r-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1)"></video>';
+  circle.className='face-circle';
+  document.getElementById('r-cap-btn').style.display='inline-flex';
+  document.getElementById('r-cap-btn').disabled=false;
+  document.getElementById('r-retake-cam').style.display='none';
+  regStream=null;
+  startRegCam();
+}
+
+function rOnFile(evt){
+  var file=evt.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=document.getElementById('uc-img');
+    img.onload=function(){
+      img.style.display='block';
+      document.getElementById('r-up-ph').style.display='none';
+      document.getElementById('r-up-zone').className='upload-circle ready';
+      rSt('up','Photo loaded — click Use This Photo');
+      document.getElementById('r-extract-btn').disabled=false;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function rExtractUpload(){
+  if(!modelsLoaded){rSt('up','Still loading models...');return;}
+  var btn=document.getElementById('r-extract-btn');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Processing...';
+  rSt('up','Detecting face in photo...');
+  var img=document.getElementById('uc-img');
+  var canvas=document.getElementById('r-canvas');
+  canvas.width=img.naturalWidth||400;canvas.height=img.naturalHeight||400;
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  var desc=await detectFace(canvas);
+  if(!desc){
+    document.getElementById('r-up-zone').className='upload-circle fail';
+    rSt('up','❌ No face detected — try a clearer photo with good lighting');
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-face-smile"></i> Use This Photo';
+    return;
+  }
+  faceDescriptor=desc;
+  document.getElementById('r-up-zone').className='upload-circle ok';
+  rSt('up','✓ Face extracted from photo!');
+  btn.style.display='none';
+  document.getElementById('r-retake-up').style.display='inline-flex';
+  document.getElementById('r-submit-btn').disabled=false;
+  showToast('Face extracted! ✓','success');
+}
+
+function rRetakeUp(){
+  faceDescriptor=null;
+  document.getElementById('r-submit-btn').disabled=true;
+  document.getElementById('uc-img').style.display='none';document.getElementById('uc-img').src='';
+  document.getElementById('r-up-ph').style.display='flex';
+  document.getElementById('r-up-zone').className='upload-circle';
+  document.getElementById('r-extract-btn').style.display='inline-flex';
+  document.getElementById('r-extract-btn').disabled=true;
+  document.getElementById('r-retake-up').style.display='none';
+  document.getElementById('r-file').value='';
+  rSt('up','Choose a clear front-facing photo');
+}
+
+async function detectFace(canvas){
+  try{
+    var det=await faceapi.detectSingleFace(canvas,new faceapi.TinyFaceDetectorOptions({scoreThreshold:0.3}))
+      .withFaceLandmarks(true).withFaceDescriptor();
+    return det ? Array.from(det.descriptor) : null;
+  }catch(e){return null;}
+}
+
+function submitReg(){
+  if(!faceDescriptor){showToast('Please capture or upload your face first','error');return;}
+  var btn=document.getElementById('r-submit-btn');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Registering...';
+  fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(regData)})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(!d.success){showToast(d.message,'error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Complete Registration';return;}
+    // Get face image from canvas for storage
+    var canvas=document.getElementById('r-canvas');
+    var imageB64=canvas.toDataURL('image/jpeg',0.85).split(',')[1];
+    return fetch('/api/register_face_data',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pin:regData.pin,descriptor:faceDescriptor,image:imageB64})});
+  })
+  .then(function(r){if(r)return r.json();})
+  .then(function(d){
+    if(d&&d.success){
+      stopRegCam();
+      document.getElementById('step2').style.display='none';
+      document.getElementById('step3').style.display='block';
+      document.getElementById('slbl2').className='step-item done';
+      document.getElementById('slbl3').className='step-item done';
+    }else{showToast((d&&d.message)||'Face save failed','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Complete Registration';}
+  })
+  .catch(function(){showToast('Network error','error');btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Complete Registration';});
+}
+
+function rSt(mode,msg){document.getElementById(mode==='cam'?'r-cam-st':'r-up-st').textContent=msg;}
+</script>
+{% endblock %}

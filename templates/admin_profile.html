@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}My Profile — Smart Attendance System{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div style="max-width:520px;margin:0 auto;">
+
+  <!-- PROFILE CARD -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-body" style="display:flex;align-items:center;gap:20px;">
+      <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:28px;color:#fff;flex-shrink:0;">
+        {{ current_user.name[0].upper() }}
+      </div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px;">{{ current_user.name }}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text3);margin-top:4px;">
+          PIN: {{ current_user.pin }} &nbsp;·&nbsp; <span style="color:var(--accent-h)">ADMINISTRATOR</span>
+        </div>
+        {% if current_user.last_login %}
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);margin-top:4px;">
+          Last login: {{ current_user.last_login.strftime('%d %b %Y, %I:%M %p') }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- CHANGE PASSWORD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><i class="fas fa-lock" style="color:var(--accent);margin-right:8px;"></i>Change Password</div>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin_profile') }}" id="pw-form">
+        <div class="form-group">
+          <label class="form-label">CURRENT PASSWORD</label>
+          <div style="position:relative;">
+            <input type="password" name="current_password" id="cur-pw" class="form-control" placeholder="Enter current password" required style="padding-right:40px;"/>
+            <button type="button" onclick="togglePw('cur-pw','eye1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;">
+              <i class="fas fa-eye" id="eye1"></i>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">NEW PASSWORD</label>
+          <div style="position:relative;">
+            <input type="password" name="new_password" id="new-pw" class="form-control" placeholder="At least 6 characters" required minlength="6" style="padding-right:40px;" oninput="checkStrength(this.value)"/>
+            <button type="button" onclick="togglePw('new-pw','eye2')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;">
+              <i class="fas fa-eye" id="eye2"></i>
+            </button>
+          </div>
+          <!-- Password strength -->
+          <div style="margin-top:8px;">
+            <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;">
+              <div id="str-bar" style="height:100%;border-radius:2px;transition:all 0.3s;width:0%"></div>
+            </div>
+            <div id="str-label" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);margin-top:4px;"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CONFIRM NEW PASSWORD</label>
+          <div style="position:relative;">
+            <input type="password" name="confirm_password" id="conf-pw" class="form-control" placeholder="Repeat new password" required style="padding-right:40px;" oninput="checkMatch()"/>
+            <button type="button" onclick="togglePw('conf-pw','eye3')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;">
+              <i class="fas fa-eye" id="eye3"></i>
+            </button>
+          </div>
+          <div id="match-msg" style="font-family:'Space Mono',monospace;font-size:10px;margin-top:4px;"></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">
+          <i class="fas fa-shield-check"></i> Update Password
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function togglePw(inputId, eyeId) {
+  var inp = document.getElementById(inputId);
+  var eye = document.getElementById(eyeId);
+  if (inp.type === 'password') { inp.type = 'text'; eye.className = 'fas fa-eye-slash'; }
+  else { inp.type = 'password'; eye.className = 'fas fa-eye'; }
+}
+function checkStrength(val) {
+  var bar = document.getElementById('str-bar');
+  var lbl = document.getElementById('str-label');
+  if (!val) { bar.style.width='0%'; lbl.textContent=''; return; }
+  var score = 0;
+  if (val.length >= 6) score++;
+  if (val.length >= 10) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  var colors = ['var(--red)','var(--red)','var(--amber)','var(--amber)','var(--teal)','var(--teal)'];
+  var labels = ['','Weak','Weak','Moderate','Strong','Very Strong'];
+  bar.style.width = (score * 20) + '%';
+  bar.style.background = colors[score];
+  lbl.style.color = colors[score];
+  lbl.textContent = labels[score];
+}
+function checkMatch() {
+  var np = document.getElementById('new-pw').value;
+  var cp = document.getElementById('conf-pw').value;
+  var msg = document.getElementById('match-msg');
+  if (!cp) { msg.textContent=''; return; }
+  if (np === cp) { msg.textContent = '✓ Passwords match'; msg.style.color = 'var(--teal)'; }
+  else { msg.textContent = '✗ Passwords do not match'; msg.style.color = 'var(--red)'; }
+}
+</script>
+{% endblock %}

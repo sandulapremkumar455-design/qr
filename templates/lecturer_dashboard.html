@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — Smart Attendance System{% endblock %}
+{% block page_title %}
+  <span style="font-family:'Syne',sans-serif;font-weight:700;">
+    <i class="fas fa-chalkboard-teacher" style="color:var(--accent);margin-right:8px;"></i>
+    Welcome, {{ current_user.name.split()[0] }}
+  </span>
+{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('start_class') }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-play"></i> Start Class
+  </a>
+{% endblock %}
+
+{% block head %}
+<style>
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.stat-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-xl);padding:20px 22px}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:2px;line-height:1;margin-bottom:4px}
+.stat-lbl{font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1.5px}
+.cls-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.cls-row:last-child{border-bottom:none}
+.cls-subject{font-family:'Syne',sans-serif;font-weight:600;font-size:13px;text-transform:capitalize}
+.cls-meta{font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:2px}
+.cls-badge{margin-left:auto;font-family:'Space Mono',monospace;font-size:11px;color:var(--teal);background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);padding:3px 10px;border-radius:20px;white-space:nowrap}
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.filter-bar select,.filter-bar input{padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:12px;font-family:'Space Mono',monospace}
+@media(max-width:640px){.stat-row{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="stat-row">
+  <div class="stat-box">
+    <div class="stat-val gradient-text">{{ total_classes }}</div>
+    <div class="stat-lbl">CLASSES CONDUCTED</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="color:var(--teal)">{{ total_students }}</div>
+    <div class="stat-lbl">TOTAL ATTENDANCES</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="color:var(--amber)">
+      {% if active_session %}LIVE{% else %}—{% endif %}
+    </div>
+    <div class="stat-lbl">ACTIVE SESSION</div>
+    {% if active_session %}
+    <a href="{{ url_for('session_live', session_id=active_session.id) }}"
+       class="btn btn-teal btn-sm" style="margin-top:10px;display:inline-flex">
+      <i class="fas fa-circle-dot"></i> Rejoin Live
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- My Classes -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">My Classes</div>
+    <a href="{{ url_for('start_class') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Class</a>
+  </div>
+  <div class="card-body">
+
+    <!-- Filters -->
+    <form method="GET" class="filter-bar" id="filter-form">
+      <select name="year" onchange="document.getElementById('filter-form').submit()">
+        <option value="">All Years</option>
+        {% for y in ['1st Year','2nd Year','3rd Year','4th Year'] %}
+        <option value="{{ y }}" {% if request.args.get('year')==y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+      <select name="branch" onchange="document.getElementById('filter-form').submit()">
+        <option value="">All Branches</option>
+        {% for b in ['CS','IT','EC','ME','CE'] %}
+        <option value="{{ b }}" {% if request.args.get('branch')==b %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="subject" placeholder="Search subject..."
+             value="{{ request.args.get('subject','') }}"
+             onchange="document.getElementById('filter-form').submit()"/>
+    </form>
+
+    {% set year_f   = request.args.get('year','') %}
+    {% set branch_f = request.args.get('branch','') %}
+    {% set subj_f   = request.args.get('subject','').lower() %}
+
+    {% set filtered = [] %}
+    {% for e in enriched %}
+      {% if (not year_f or e.session.year == year_f) and
+            (not branch_f or e.session.branch.upper() == branch_f) and
+            (not subj_f or subj_f in e.session.subject.name.lower()) %}
+        {% set _ = filtered.append(e) %}
+      {% endif %}
+    {% endfor %}
+
+    {% if filtered %}
+    {% for e in filtered %}
+    {% set s = e.session %}
+    <div class="cls-row">
+      <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;
+        background:{% if s.is_active and not s.is_expired() %}var(--teal){% else %}var(--text3){% endif %};
+        {% if s.is_active and not s.is_expired() %}box-shadow:0 0 8px rgba(0,212,170,0.6);animation:pulse 2s infinite{% endif %}">
+      </div>
+      <div style="flex:1">
+        <div class="cls-subject">{{ s.subject.name }}</div>
+        <div class="cls-meta">
+          {{ s.year }} · {{ s.branch }} · {{ s.duration }} min ·
+          {{ s.created_at.strftime('%d %b %Y, %I:%M %p') }}
+        </div>
+      </div>
+      <div class="cls-badge"><i class="fas fa-users"></i> {{ e.count }}</div>
+      {% if s.is_active and not s.is_expired() %}
+      <a href="{{ url_for('session_live', session_id=s.id) }}" class="btn btn-teal btn-sm">
+        <i class="fas fa-circle-dot"></i> Live
+      </a>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><i class="fas fa-chalkboard"></i><p>No classes found</p></div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

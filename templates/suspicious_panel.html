@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Suspicious Activity — Smart Attendance System{% endblock %}
+{% block page_title %}Security & Suspicious Activity{% endblock %}
+{% block topbar_actions %}
+  <form method="POST" action="{{ url_for('clear_all_suspicious') }}" onsubmit="return confirm('Clear ALL suspicious logs? This cannot be undone.')">
+    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(255,107,107,0.3);">
+      <i class="fas fa-trash"></i> Clear All Logs
+    </button>
+  </form>
+{% endblock %}
+
+{% block content %}
+
+<!-- SUSPENDED USERS -->
+{% if suspended %}
+<div style="margin-bottom:20px;">
+  <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--red);letter-spacing:2px;margin-bottom:12px;">SUSPENDED ACCOUNTS ({{ suspended|length }})</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    {% for u in suspended %}
+    <div style="padding:10px 16px;background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.3);border-radius:var(--r-md);display:flex;align-items:center;gap:12px;">
+      <div class="avatar" style="width:30px;height:30px;font-size:11px;background:linear-gradient(135deg,var(--red),var(--red-d));">{{ u.name[0].upper() }}</div>
+      <div>
+        <a href="{{ url_for('student_attendance_detail', uid=u.id) }}" style="font-weight:500;font-size:13px;color:var(--text);text-decoration:none;" onmouseover="this.style.color='var(--accent-h)'" onmouseout="this.style.color='var(--text)'">{{ u.name }}</a>
+        <div class="font-mono text-xs text-muted">{{ u.pin }}</div>
+      </div>
+      <form method="POST" action="{{ url_for('toggle_suspend', uid=u.id) }}">
+        <button class="btn btn-ghost btn-sm" style="color:var(--teal);">
+          <i class="fas fa-lock-open"></i> Unsuspend
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- SUMMARY CHIPS -->
+<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+  <div style="padding:10px 18px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md);">
+    <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);">TOTAL LOGS</span>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;margin-left:10px;color:var(--red);">{{ logs|length }}</span>
+  </div>
+  <div style="padding:10px 18px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md);">
+    <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);">SUSPENDED</span>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;margin-left:10px;color:var(--amber);">{{ suspended|length }}</span>
+  </div>
+</div>
+
+<!-- LOGS TABLE -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-shield-exclamation" style="color:var(--red);margin-right:8px"></i>Suspicious Activity Log</div>
+    <span class="badge badge-danger">{{ logs|length }} events</span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>USER</th>
+            <th>REASON</th>
+            <th>DETAIL</th>
+            <th>IP</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="log-table">
+          {% for log in logs %}
+          <tr id="log-{{ log.id }}">
+            <td class="font-mono text-xs text-muted no-wrap">{{ log.timestamp.strftime('%d %b %H:%M:%S') }}</td>
+            <td>
+              {% if log.user %}
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="avatar" style="width:26px;height:26px;font-size:10px;">{{ log.user.name[0].upper() }}</div>
+                  <div>
+                    <a href="{{ url_for('student_attendance_detail', uid=log.user.id) }}" style="font-size:13px;color:var(--text);text-decoration:none;" onmouseover="this.style.color='var(--accent-h)'" onmouseout="this.style.color='var(--text)'">{{ log.user.name }}</a>
+                    {% if log.user.is_suspended %}
+                    <div style="font-size:10px;color:var(--red);font-family:'Space Mono',monospace;">SUSPENDED</div>
+                    {% endif %}
+                  </div>
+                </div>
+              {% else %}
+                <span class="text-muted">Unknown</span>
+              {% endif %}
+            </td>
+            <td>
+              {% set colors = {'TOKEN_MISMATCH':'danger','BATCH_MISMATCH':'amber','OUTSIDE_CAMPUS':'amber','WRONG_PASSWORD':'danger','INVALID_PIN':'neutral','FACE_MISMATCH':'danger'} %}
+              <span class="badge badge-{{ colors.get(log.reason, 'neutral') }}">{{ log.reason }}</span>
+            </td>
+            <td class="text-xs text-muted" style="max-width:220px;white-space:normal;">{{ log.detail or '—' }}</td>
+            <td class="font-mono text-xs text-muted">{{ log.ip_address or '—' }}</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                {% if log.user and not log.user.is_suspended %}
+                <form method="POST" action="{{ url_for('toggle_suspend', uid=log.user.id) }}">
+                  <button type="submit" class="btn btn-ghost btn-icon btn-sm" title="Suspend user">
+                    <i class="fas fa-lock" style="color:var(--amber)"></i>
+                  </button>
+                </form>
+                {% elif log.user and log.user.is_suspended %}
+                <form method="POST" action="{{ url_for('toggle_suspend', uid=log.user.id) }}">
+                  <button type="submit" class="btn btn-ghost btn-icon btn-sm" title="Unsuspend user">
+                    <i class="fas fa-lock-open" style="color:var(--teal)"></i>
+                  </button>
+                </form>
+                {% endif %}
+                <button onclick="clearLog({{ log.id }})" class="btn btn-ghost btn-icon btn-sm" title="Remove this log entry">
+                  <i class="fas fa-xmark" style="color:var(--red)"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty-state"><i class="fas fa-shield-check"></i><p>No suspicious activity recorded. System is clean.</p></div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function clearLog(id) {
+  fetch('/admin/suspicious/clear/' + id, {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        var row = document.getElementById('log-' + id);
+        if (row) { row.style.opacity='0'; row.style.transition='opacity 0.3s'; setTimeout(()=>row.remove(), 300); }
+        showToast('Log entry removed.', 'success', 2000);
+      }
+    });
+}
+</script>
+{% endblock %}

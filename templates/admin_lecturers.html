@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Manage Lecturers — Smart Attendance System{% endblock %}
+{% block page_title %}Lecturers{% endblock %}
+{% block topbar_actions %}
+  <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-modal').style.display='flex'">
+    <i class="fas fa-plus"></i> Add Lecturer
+  </button>
+{% endblock %}
+
+{% block head %}
+<style>
+.lec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.lec-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;transition:border-color 0.2s}
+.lec-card:hover{border-color:var(--border3)}
+.lec-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:#fff;flex-shrink:0}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-box{background:var(--panel);border:1px solid var(--border2);border-radius:var(--r-xl);padding:32px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+/* Face capture in modal */
+.face-vid-wrap{position:relative;width:160px;height:160px;border-radius:50%;overflow:hidden;margin:0 auto 10px;background:#000;border:3px solid var(--border2)}
+.face-vid-wrap.live{border-color:var(--accent)}
+.face-vid-wrap.captured{border-color:var(--teal)}
+#add-face-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#add-face-preview{width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)}
+#add-face-canvas{display:none}
+</style>
+<script>
+  var s=document.createElement("script");
+  s.src="/static/face-api.min.js";
+  s.onerror=function(){var fb=document.createElement("script");fb.src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";document.head.appendChild(fb);};
+  document.head.appendChild(s);
+</script>
+{% endblock %}
+
+{% block content %}
+
+{% if lecturers %}
+<div class="lec-grid">
+  {% for e in lecturers %}
+  <div class="lec-card">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div class="lec-avatar">{{ e.user.name[0].upper() }}</div>
+      <div style="flex:1">
+        <a href="{{ url_for('admin_lecturer_detail', uid=e.user.id) }}"
+           style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--text);text-decoration:none">
+          {{ e.user.name }}
+        </a>
+        <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:3px">
+          ID: {{ e.user.pin }}
+        </div>
+      </div>
+      <form method="POST" action="{{ url_for('delete_lecturer', uid=e.user.id) }}"
+            onsubmit="return confirm('Delete {{ e.user.name }}?')">
+        <button type="submit" class="btn btn-sm" style="background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);color:var(--red)">
+          <i class="fas fa-trash"></i>
+        </button>
+      </form>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:var(--bg3);border-radius:var(--r-sm);padding:10px 12px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent)">{{ e.total_classes }}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:'Space Mono',monospace">CLASSES</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--r-sm);padding:10px 12px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--teal)">{{ e.total_students }}</div>
+        <div style="font-size:10px;color:var(--text3);font-family:'Space Mono',monospace">ATTENDANCES</div>
+      </div>
+    </div>
+    {% if e.last_class %}
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;font-family:'Space Mono',monospace">
+      Last class: {{ e.last_class.strftime('%d %b %Y') }}
+    </div>
+    {% endif %}
+    <a href="{{ url_for('admin_lecturer_detail', uid=e.user.id) }}"
+       class="btn btn-ghost btn-full" style="margin-top:12px">
+      <i class="fas fa-table-list"></i> View All Classes
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="margin-top:60px">
+  <i class="fas fa-chalkboard-teacher"></i>
+  <p>No lecturers added yet</p>
+  <button class="btn btn-primary" onclick="document.getElementById('add-modal').style.display='flex'">
+    <i class="fas fa-plus"></i> Add First Lecturer
+  </button>
+</div>
+{% endif %}
+
+<!-- ADD LECTURER MODAL -->
+<div class="modal" id="add-modal" onclick="if(event.target===this){closeModal()}">
+  <div class="modal-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px">Add Lecturer</div>
+      <button onclick="closeModal()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer"><i class="fas fa-xmark"></i></button>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_add_lecturer') }}" id="add-form">
+      <div class="form-group">
+        <label class="form-label">FULL NAME</label>
+        <input type="text" name="name" class="form-control" placeholder="Lecturer name" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">LECTURER ID / PIN</label>
+        <input type="text" name="pin" class="form-control" placeholder="e.g. LEC-001" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PASSWORD</label>
+        <input type="password" name="password" class="form-control" placeholder="Set a password" required/>
+      </div>
+
+      <!-- Face capture -->
+      <div class="form-label" style="margin-bottom:8px">FACE PHOTO</div>
+      <div style="background:var(--bg3);border:1px dashed var(--border2);border-radius:var(--r-lg);padding:16px;text-align:center;margin-bottom:16px" id="face-box">
+        <div class="face-vid-wrap" id="add-face-wrap">
+          <video id="add-face-video" autoplay muted playsinline></video>
+          <img id="add-face-preview" src="" alt=""/>
+        </div>
+        <canvas id="add-face-canvas"></canvas>
+        <div style="font-size:11px;color:var(--text2);font-family:'Space Mono',monospace;margin-bottom:10px" id="add-face-status">
+          Click below to open camera
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm btn-ghost" id="cam-btn" onclick="startAddCam()">
+            <i class="fas fa-camera"></i> Open Camera
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" id="cap-btn" onclick="captureAdd()" style="display:none">
+            <i class="fas fa-circle"></i> Capture
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" id="retake-btn" onclick="retakeAdd()" style="display:none">
+            <i class="fas fa-rotate-left"></i> Retake
+          </button>
+          <label class="btn btn-sm btn-ghost" style="cursor:pointer">
+            <i class="fas fa-upload"></i> Upload Photo
+            <input type="file" id="photo-upload" accept="image/*" onchange="handleUpload(event)" style="display:none"/>
+          </label>
+        </div>
+      </div>
+
+      <input type="hidden" name="descriptor" id="face-descriptor-input"/>
+      <input type="hidden" name="face_image" id="face-image-input"/>
+
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn btn-ghost btn-full" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
+          <i class="fas fa-plus"></i> Add Lecturer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var addStream = null, addModels = false, addDescriptor = null;
+
+// Pre-load models immediately on page load (same as students)
+window.addEventListener('load', function() {
+  setTimeout(loadAddModels, 500);
+});
+
+function closeModal(){
+  document.getElementById('add-modal').style.display='none';
+  stopAddCam();
+}
+
+function startAddCam(){
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:320,height:320}})
+  .then(function(s){
+    addStream=s;
+    document.getElementById('add-face-video').srcObject=s;
+    document.getElementById('add-face-wrap').className='face-vid-wrap live';
+    document.getElementById('cam-btn').style.display='none';
+    document.getElementById('cap-btn').style.display='inline-flex';
+    if(addModels){
+      document.getElementById('add-face-status').textContent='Position face and click Capture';
+    } else {
+      document.getElementById('add-face-status').textContent='Loading AI models, please wait...';
+      // Poll until ready
+      var poll=setInterval(function(){
+        if(addModels){
+          clearInterval(poll);
+          document.getElementById('add-face-status').textContent='Models ready — click Capture';
+        }
+      },300);
+    }
+  }).catch(function(){ document.getElementById('add-face-status').textContent='Camera access denied'; });
+}
+
+function stopAddCam(){
+  if(addStream){addStream.getTracks().forEach(function(t){t.stop()});addStream=null;}
+}
+
+async function loadAddModels(){
+  document.getElementById('add-face-status').textContent='Loading AI models...';
+  try{
+    var U='/static/weights';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(U);
+    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(U);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(U);
+    addModels=true;
+    document.getElementById('add-face-status').textContent='Models ready';
+  }catch(e){document.getElementById('add-face-status').textContent='Model load failed';}
+}
+
+async function captureAdd(){
+  if(!addModels){
+    document.getElementById('add-face-status').textContent='Still loading AI models, please wait...';
+    return;
+  }
+  document.getElementById('add-face-status').textContent='Detecting face...';
+  var video=document.getElementById('add-face-video');
+  var canvas=document.getElementById('add-face-canvas');
+  canvas.width=video.videoWidth||320; canvas.height=video.videoHeight||320;
+  canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+
+  var det=await faceapi.detectSingleFace(canvas,new faceapi.TinyFaceDetectorOptions({scoreThreshold:0.4}))
+    .withFaceLandmarks(true).withFaceDescriptor();
+
+  if(!det){document.getElementById('add-face-status').textContent='No face detected — try again';return;}
+
+  addDescriptor=Array.from(det.descriptor);
+  document.getElementById('face-descriptor-input').value=JSON.stringify(addDescriptor);
+
+  var preview=document.getElementById('add-face-preview');
+  var imgDataUrl=canvas.toDataURL('image/jpeg',0.8);
+  preview.src=imgDataUrl;
+  // Store base64 image (strip data:image/jpeg;base64, prefix)
+  document.getElementById('face-image-input').value=imgDataUrl.split(',')[1]||'';
+  preview.src=canvas.toDataURL('image/jpeg',0.8);
+  preview.style.display='block';
+  document.getElementById('add-face-video').style.display='none';
+  document.getElementById('add-face-wrap').className='face-vid-wrap captured';
+  document.getElementById('cap-btn').style.display='none';
+  document.getElementById('retake-btn').style.display='inline-flex';
+  document.getElementById('add-face-status').textContent='✓ Face captured!';
+  stopAddCam();
+}
+
+function retakeAdd(){
+  addDescriptor=null;
+  document.getElementById('face-descriptor-input').value='';
+  document.getElementById('add-face-preview').style.display='none';
+  document.getElementById('add-face-video').style.display='block';
+  document.getElementById('add-face-wrap').className='face-vid-wrap';
+  document.getElementById('retake-btn').style.display='none';
+  document.getElementById('cam-btn').style.display='inline-flex';
+  document.getElementById('add-face-status').textContent='Click Open Camera to retry';
+}
+
+async function handleUpload(evt){
+  var file=evt.target.files[0]; if(!file) return;
+  document.getElementById('add-face-status').textContent='Processing photo...';
+  // Wait for models if still loading
+  if(!addModels){
+    document.getElementById('add-face-status').textContent='Waiting for AI models...';
+    await new Promise(function(resolve){
+      var poll=setInterval(function(){if(addModels){clearInterval(poll);resolve();}},200);
+    });
+  }
+  document.getElementById('add-face-status').textContent='Analysing photo...';
+  var img=new Image();
+  img.onload=async function(){
+    var canvas=document.getElementById('add-face-canvas');
+    canvas.width=img.width; canvas.height=img.height;
+    canvas.getContext('2d').drawImage(img,0,0);
+    var det=await faceapi.detectSingleFace(canvas,new faceapi.TinyFaceDetectorOptions({scoreThreshold:0.3}))
+      .withFaceLandmarks(true).withFaceDescriptor();
+    if(!det){document.getElementById('add-face-status').textContent='No face in photo — try another';return;}
+    addDescriptor=Array.from(det.descriptor);
+    document.getElementById('face-descriptor-input').value=JSON.stringify(addDescriptor);
+    var preview=document.getElementById('add-face-preview');
+    var imgDataUrl=canvas.toDataURL('image/jpeg',0.8);
+    preview.src=imgDataUrl;
+    document.getElementById('face-image-input').value=imgDataUrl.split(',')[1]||'';
+    preview.style.display='block';
+    document.getElementById('add-face-video').style.display='none';
+    document.getElementById('add-face-wrap').className='face-vid-wrap captured';
+    document.getElementById('add-face-status').textContent='✓ Face extracted from photo!';
+  };
+  img.src=URL.createObjectURL(file);
+}
+</script>
+{% endblock %}

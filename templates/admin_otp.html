@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Admin OTP — Smart Attendance System{% endblock %}
+
+{% block auth_content %}
+<style>
+.otp-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:0.2;pointer-events:none;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 80%)}
+.otp-box{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--border2);border-radius:var(--r-xl);padding:40px;box-shadow:var(--shadow-lg);animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1)}
+.otp-icon{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--teal));display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin:0 auto 20px}
+.otp-inputs{display:flex;gap:10px;justify-content:center;margin:24px 0}
+.otp-digit{width:52px;height:60px;border-radius:var(--r-md);background:var(--bg3);border:2px solid var(--border);color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:28px;text-align:center;transition:border-color 0.2s;outline:none}
+.otp-digit:focus{border-color:var(--accent);background:rgba(108,99,255,0.08)}
+.timer{font-family:'Space Mono',monospace;font-size:12px;color:var(--text3);text-align:center;margin-bottom:16px}
+.timer span{color:var(--accent);font-weight:700}
+</style>
+
+<div class="grid-bg"></div>
+<div class="otp-wrap">
+  <div class="otp-box">
+    <div class="otp-icon"><i class="fas fa-envelope-open-text"></i></div>
+    <div style="text-align:center;margin-bottom:6px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px">Check Your Email</div>
+    </div>
+    <div style="text-align:center;color:var(--text2);font-size:13px;margin-bottom:4px">
+      OTP sent to <strong style="color:var(--text)">sandulapremkumar455@gmail.com</strong>
+    </div>
+    <div style="text-align:center;color:var(--text3);font-size:12px;margin-bottom:8px;font-family:'Space Mono',monospace">
+      Valid for {{ 5 }} minutes
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}" style="margin-bottom:16px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;
+        background:{% if cat=='error' %}rgba(255,107,107,0.1){% else %}rgba(0,212,170,0.1){% endif %};
+        border:1px solid {% if cat=='error' %}rgba(255,107,107,0.3){% else %}rgba(0,212,170,0.3){% endif %};
+        color:{% if cat=='error' %}var(--red){% else %}var(--teal){% endif %}">
+        {{ msg }}
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" id="otp-form">
+      <div class="otp-inputs">
+        <input class="otp-digit" type="text" maxlength="1" id="d0" inputmode="numeric" autofocus/>
+        <input class="otp-digit" type="text" maxlength="1" id="d1" inputmode="numeric"/>
+        <input class="otp-digit" type="text" maxlength="1" id="d2" inputmode="numeric"/>
+        <input class="otp-digit" type="text" maxlength="1" id="d3" inputmode="numeric"/>
+        <input class="otp-digit" type="text" maxlength="1" id="d4" inputmode="numeric"/>
+        <input class="otp-digit" type="text" maxlength="1" id="d5" inputmode="numeric"/>
+      </div>
+      <input type="hidden" name="otp" id="otp-hidden"/>
+
+      <div class="timer">Expires in <span id="countdown">05:00</span></div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="verify-btn">
+        <i class="fas fa-check-circle"></i> Verify OTP
+      </button>
+    </form>
+
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-ghost btn-full btn-sm" onclick="resendOtp()" id="resend-btn">
+        <i class="fas fa-rotate-right"></i> Resend OTP
+      </button>
+      <a href="{{ url_for('login') }}" class="btn btn-ghost btn-full btn-sm">
+        <i class="fas fa-arrow-left"></i> Back to Login
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── OTP digit inputs ──
+var digits = document.querySelectorAll('.otp-digit');
+digits.forEach(function(inp, i) {
+  inp.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g,'');
+    this.value = v.slice(-1);
+    if (v && i < 5) digits[i+1].focus();
+    updateHidden();
+  });
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Backspace' && !this.value && i > 0) digits[i-1].focus();
+  });
+  inp.addEventListener('paste', function(e) {
+    e.preventDefault();
+    var pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'');
+    pasted.split('').slice(0,6).forEach(function(ch, j) {
+      if (digits[i+j]) { digits[i+j].value = ch; }
+    });
+    updateHidden();
+    var next = Math.min(i + pasted.length, 5);
+    digits[next].focus();
+  });
+});
+
+function updateHidden() {
+  var code = Array.from(digits).map(function(d){return d.value}).join('');
+  document.getElementById('otp-hidden').value = code;
+  if (code.length === 6) {
+    document.getElementById('verify-btn').style.background = 'var(--teal)';
+  }
+}
+
+// ── Form submit ──
+document.getElementById('otp-form').addEventListener('submit', function(e) {
+  var code = document.getElementById('otp-hidden').value;
+  if (code.length !== 6) {
+    e.preventDefault();
+    showToast('Enter all 6 digits', 'error');
+  }
+});
+
+// ── Countdown timer ──
+var totalSeconds = 5 * 60;
+var timer = setInterval(function() {
+  totalSeconds--;
+  if (totalSeconds <= 0) {
+    clearInterval(timer);
+    document.getElementById('countdown').textContent = '00:00';
+    document.getElementById('countdown').style.color = 'var(--red)';
+    document.getElementById('verify-btn').disabled = true;
+    document.getElementById('verify-btn').innerHTML = '<i class="fas fa-clock"></i> OTP Expired';
+    return;
+  }
+  var m = Math.floor(totalSeconds/60).toString().padStart(2,'0');
+  var s = (totalSeconds%60).toString().padStart(2,'0');
+  document.getElementById('countdown').textContent = m+':'+s;
+}, 1000);
+
+// ── Resend OTP ──
+function resendOtp() {
+  var btn = document.getElementById('resend-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+  fetch('/admin/otp/resend', {method:'POST'})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    showToast(d.message, d.success ? 'success' : 'error');
+    if (d.success) {
+      totalSeconds = 5 * 60;
+      digits.forEach(function(d){d.value='';});
+      document.getElementById('otp-hidden').value='';
+      digits[0].focus();
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-rotate-right"></i> Resend OTP';
+  })
+  .catch(function(){
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-rotate-right"></i> Resend OTP';
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Recent Class — Smart Attendance System{% endblock %}
+{% block page_title %}Recent Class Manager{% endblock %}
+
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;">
+
+  <!-- LEFT: ATTENDEES -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    {% if recent_session %}
+    <!-- SESSION INFO -->
+    <div class="card" style="border-color:rgba(0,212,170,0.3);">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:2px;margin-bottom:6px;">SELECTED SESSION</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;text-transform:capitalize;letter-spacing:1px;">
+              {{ recent_session.subject.name }}
+            </div>
+            <div style="font-size:12px;color:var(--text2);font-family:'Space Mono',monospace;margin-top:4px;">
+              {{ recent_session.year }} · {{ recent_session.branch }} · {{ recent_session.created_at.strftime('%d %b %Y, %I:%M %p') }}
+            </div>
+            {% if is_admin %}
+            <div style="font-size:12px;font-family:'Space Mono',monospace;margin-top:3px;">
+              <span style="color:var(--text3)">CONDUCTED BY:</span>
+              <span style="color:var(--accent-h)">{{ recent_session.created_by.name }}</span>
+            </div>
+            {% endif %}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--teal);">{{ attendance_list|length }}</div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);">PRESENT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Attendance List</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge-teal">{{ attendance_list|length }} present</span>
+          {% if is_admin %}
+          <button onclick="loadAbsent({{ recent_session.id }})" class="btn btn-ghost btn-sm">
+            <i class="fas fa-user-xmark" style="color:var(--red)"></i> Absent List
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>STUDENT</th>
+                <th>PIN</th>
+                <th>TIME</th>
+                <th>METHOD</th>
+                <th>LOCATION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for att, user in attendance_list %}
+              <tr>
+                <td class="text-muted font-mono text-xs">{{ loop.index }}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="avatar" style="width:30px;height:30px;font-size:11px;">{{ user.name[0].upper() }}</div>
+                    {{ user.name }}
+                  </div>
+                </td>
+                <td><span class="badge badge-neutral font-mono">{{ user.pin }}</span></td>
+                <td class="font-mono text-xs text-muted">{{ att.timestamp.strftime('%H:%M:%S') }}</td>
+                <td>
+                  {% if att.is_manual %}
+                    <span class="badge badge-amber">✏️ Manual</span>
+                  {% else %}
+                    <span class="badge badge-teal">📱 QR</span>
+                  {% endif %}
+                </td>
+                <td class="font-mono text-xs text-muted">
+                  {% if att.latitude and att.latitude != 'Manual' %}{{ att.latitude[:8] }}, {{ att.longitude[:8] }}
+                  {% else %}Manual Entry{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state"><i class="fas fa-user-clock"></i><p>No attendance yet.</p></div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="empty-state card" style="padding:60px;">
+      <i class="fas fa-chalkboard" style="font-size:48px;margin-bottom:16px;opacity:0.3;display:block;text-align:center;"></i>
+      <p style="text-align:center;">No sessions found. <a href="{{ url_for('start_class') }}" style="color:var(--accent-h)">Start one!</a></p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- RIGHT: MANUAL ENTRY + SESSION SELECTOR -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- SESSION SELECTOR -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Select Session</div></div>
+      <div class="card-body">
+        <form method="GET" action="{{ url_for('recent_class') }}">
+          <div class="form-row" style="margin-bottom:0;">
+            {% if is_admin %}
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">YEAR FILTER</label>
+              <select name="year" class="form-control" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option {% if year == '1st Year' %}selected{% endif %}>1st Year</option>
+                <option {% if year == '2nd Year' %}selected{% endif %}>2nd Year</option>
+                <option {% if year == '3rd Year' %}selected{% endif %}>3rd Year</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">BRANCH FILTER</label>
+              <select name="branch" class="form-control" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option {% if branch == 'CS' %}selected{% endif %}>CS</option>
+                <option {% if branch == 'IT' %}selected{% endif %}>IT</option>
+                <option {% if branch == 'EC' %}selected{% endif %}>EC</option>
+              </select>
+            </div>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MANUAL ADD (single student) -->
+    {% if recent_session %}
+    <div class="card" style="border-color:rgba(255,209,102,0.3);">
+      <div class="card-header">
+        <div class="card-title"><i class="fas fa-user-plus" style="color:var(--amber);margin-right:8px"></i>Add Manually</div>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('recent_class', year=year, branch=branch) }}">
+          <input type="hidden" name="session_id" value="{{ recent_session.id }}"/>
+          <div class="form-group">
+            <label class="form-label">STUDENT PIN</label>
+            <input type="text" name="pin" class="form-control" placeholder="e.g. 23005-CS-055" required autocomplete="off"/>
+          </div>
+          <div style="background:rgba(255,209,102,0.06);border:1px solid rgba(255,209,102,0.2);border-radius:var(--r-md);padding:12px;margin-bottom:14px;font-size:12px;color:var(--text2);">
+            <i class="fas fa-triangle-exclamation" style="color:var(--amber);margin-right:6px;"></i>
+            Manual entries are logged separately.
+          </div>
+          <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-plus"></i> Mark Attendance</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- SESSION SWITCHER -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent Sessions</div></div>
+      <div style="max-height:320px;overflow-y:auto;">
+        {% for s in all_sessions %}
+        <a href="{{ url_for('recent_class') }}?session={{ s.id }}"
+           style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);text-decoration:none;transition:background 0.15s;{% if recent_session and s.id == recent_session.id %}background:rgba(108,99,255,0.08);{% endif %}"
+           onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background='{% if recent_session and s.id == recent_session.id %}rgba(108,99,255,0.08){% endif %}'">
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ 'var(--teal)' if s.is_active and not s.is_expired() else 'var(--text3)' }};flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;font-family:'Syne',sans-serif;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ s.subject.name }}</div>
+            <div style="font-size:10px;color:var(--text3);font-family:'Space Mono',monospace;">
+              {{ s.branch }} {{ s.year }} · {{ s.created_at.strftime('%d %b') }}
+              {% if is_admin %} · {{ s.created_by.name }}{% endif %}
+            </div>
+          </div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--teal);">{{ s.attendances.count() }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ABSENT STUDENTS PANEL (admin only) -->
+{% if is_admin and recent_session %}
+<div id="absent-panel" style="display:none;margin-top:20px;">
+  <div class="card" style="border-color:rgba(255,107,107,0.3);">
+    <div class="card-header">
+      <div class="card-title"><i class="fas fa-user-xmark" style="color:var(--red);margin-right:8px"></i>Absent Students</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="absent-count-badge" class="badge badge-danger">Loading...</span>
+        <button onclick="selectAllAbsent()" class="btn btn-ghost btn-sm">Select All</button>
+        <button onclick="markBulkAttendance({{ recent_session.id }})" class="btn btn-primary btn-sm">
+          <i class="fas fa-check-double"></i> Mark Selected
+        </button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div id="absent-list" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+var absentData = [];
+
+function loadAbsent(sessionId) {
+  var panel = document.getElementById('absent-panel');
+  var list = document.getElementById('absent-list');
+  if (!panel) return;
+  panel.style.display = 'block';
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-family:\'Space Mono\',monospace;font-size:11px;">Loading absent students...</div>';
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+
+  fetch('/api/admin/session/' + sessionId + '/absent')
+    .then(r => r.json())
+    .then(data => {
+      absentData = data;
+      document.getElementById('absent-count-badge').textContent = data.length + ' absent';
+      if (data.length === 0) {
+        list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--teal);font-family:\'Space Mono\',monospace;font-size:11px;"><i class="fas fa-circle-check" style="font-size:24px;display:block;margin-bottom:8px;"></i>All students attended!</div>';
+        return;
+      }
+      list.innerHTML = data.map(s => `
+        <label style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
+          <input type="checkbox" class="absent-cb" data-id="${s.id}" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;"/>
+          <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">${s.name[0].toUpperCase()}</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;font-size:13px;">${s.name}</div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);">${s.pin}</div>
+          </div>
+          <span class="badge badge-danger" style="font-size:9px;">ABSENT</span>
+        </label>
+      `).join('');
+    }).catch(err => {
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);">Failed to load absent students.</div>';
+    });
+}
+
+function selectAllAbsent() {
+  document.querySelectorAll('.absent-cb').forEach(cb => cb.checked = true);
+}
+
+function markBulkAttendance(sessionId) {
+  var checked = Array.from(document.querySelectorAll('.absent-cb:checked')).map(cb => parseInt(cb.dataset.id));
+  if (checked.length === 0) { showToast('Select at least one student.', 'warning'); return; }
+  if (!confirm('Mark attendance for ' + checked.length + ' selected student(s)?')) return;
+
+  fetch('/api/admin/bulk_attendance', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({session_id: sessionId, student_ids: checked})
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      showToast(d.message, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      showToast(d.message || 'Error occurred.', 'error');
+    }
+  });
+}
+</script>
+
+{% endblock %}

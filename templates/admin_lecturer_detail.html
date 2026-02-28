@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ lecturer.name }} — Classes{% endblock %}
+{% block page_title %}
+  <a href="{{ url_for('admin_lecturers') }}" style="color:var(--text3);text-decoration:none">Lecturers</a>
+  <span style="color:var(--text3);margin:0 8px">/</span>
+  {{ lecturer.name }}
+{% endblock %}
+
+{% block content %}
+<!-- Header card -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-body" style="display:flex;align-items:center;gap:18px;padding:20px 22px">
+    <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:22px;color:#fff;flex-shrink:0">
+      {{ lecturer.name[0].upper() }}
+    </div>
+    <div style="flex:1">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px">{{ lecturer.name }}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:3px">
+        ID: {{ lecturer.pin }} &nbsp;·&nbsp; {{ total_classes }} classes &nbsp;·&nbsp; {{ total_students }} attendances
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+  <select name="year" onchange="this.form.submit()" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:12px;font-family:'Space Mono',monospace">
+    <option value="">All Years</option>
+    {% for y in ['1st Year','2nd Year','3rd Year','4th Year'] %}
+    <option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <select name="branch" onchange="this.form.submit()" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:12px;font-family:'Space Mono',monospace">
+    <option value="">All Branches</option>
+    {% for b in ['CS','IT','EC','ME','CE'] %}
+    <option value="{{ b }}" {% if branch==b %}selected{% endif %}>{{ b }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="subject" placeholder="Search subject..." value="{{ subject }}"
+         style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:12px;font-family:'Space Mono',monospace"/>
+  <button type="submit" class="btn btn-sm btn-ghost"><i class="fas fa-filter"></i> Filter</button>
+  <a href="{{ url_for('admin_lecturer_detail', uid=lecturer.id) }}" class="btn btn-sm btn-ghost">Clear</a>
+</form>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">All Classes ({{ enriched|length }})</div>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if enriched %}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          {% for h in ['SUBJECT','YEAR','BRANCH','DATE','DURATION','STUDENTS','STATUS'] %}
+          <th style="padding:10px 16px;font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1.5px;text-align:left;font-weight:400">{{ h }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in enriched %}
+        {% set s = e.session %}
+        <tr style="border-bottom:1px solid var(--border)" class="table-row">
+          <td style="padding:12px 16px;font-family:'Syne',sans-serif;font-weight:600;font-size:13px;text-transform:capitalize">{{ s.subject.name }}</td>
+          <td style="padding:12px 16px;font-size:12px;color:var(--text2)">{{ s.year }}</td>
+          <td style="padding:12px 16px;font-size:12px;color:var(--text2)">{{ s.branch }}</td>
+          <td style="padding:12px 16px;font-family:'Space Mono',monospace;font-size:11px;color:var(--text3)">{{ s.created_at.strftime('%d %b %Y %I:%M %p') }}</td>
+          <td style="padding:12px 16px;font-size:12px;color:var(--text2)">{{ s.duration }} min</td>
+          <td style="padding:12px 16px">
+            <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--teal)">
+              <i class="fas fa-users"></i> {{ e.count }}
+            </span>
+          </td>
+          <td style="padding:12px 16px">
+            {% if s.is_active and not s.is_expired() %}
+            <span class="badge badge-teal"><i class="fas fa-circle-dot"></i> Live</span>
+            {% else %}
+            <span class="badge" style="background:var(--bg3);color:var(--text3);border:1px solid var(--border)">Ended</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><i class="fas fa-chalkboard"></i><p>No classes match filters</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Subject Management — Smart Attendance System{% endblock %}
+{% block page_title %}Subject Management{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+  <div style="font-size:13px;color:var(--text2);">
+    Rename, merge or delete subjects. Merging moves all sessions from one subject into another.
+  </div>
+</div>
+
+{% if subjects %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-book-open" style="color:var(--accent);margin-right:8px"></i>All Subjects</div>
+    <span class="badge badge-accent">{{ subjects|length }} total</span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>SUBJECT NAME</th>
+            <th>BATCH</th>
+            <th>CLASS SESSIONS</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in subjects %}
+          {% set s = item.subject %}
+          <tr id="row-{{ s.id }}">
+            <td>
+              <div id="view-{{ s.id }}" style="display:flex;align-items:center;gap:10px;">
+                <i class="fas fa-book" style="color:var(--accent);font-size:12px;"></i>
+                <span style="font-family:'Syne',sans-serif;font-weight:600;text-transform:capitalize;">{{ s.name }}</span>
+              </div>
+              <form id="rename-form-{{ s.id }}" style="display:none;" method="POST" action="{{ url_for('rename_subject', sid=s.id) }}">
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="text" name="name" value="{{ s.name }}" class="form-control" style="font-size:13px;padding:6px 10px;"/>
+                  <button type="submit" class="btn btn-teal btn-sm"><i class="fas fa-check"></i></button>
+                  <button type="button" onclick="cancelRename({{ s.id }})" class="btn btn-ghost btn-sm"><i class="fas fa-xmark"></i></button>
+                </div>
+              </form>
+            </td>
+            <td class="text-sm text-muted">{{ s.year or '—' }} · {{ (s.branch or '—').upper() }}</td>
+            <td>
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--teal);">{{ item.sessions }}</span>
+              <span class="text-muted text-xs"> sessions</span>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button onclick="startRename({{ s.id }})" class="btn btn-ghost btn-sm" title="Rename">
+                  <i class="fas fa-pen" style="color:var(--accent-h)"></i> Rename
+                </button>
+                <button onclick="openMerge({{ s.id }}, '{{ s.name|title }}', '{{ s.year }}', '{{ s.branch }}')" class="btn btn-ghost btn-sm" title="Merge into another subject">
+                  <i class="fas fa-code-merge" style="color:var(--amber)"></i> Merge
+                </button>
+                {% if item.sessions == 0 %}
+                <form method="POST" action="{{ url_for('delete_subject', sid=s.id) }}" onsubmit="return confirm('Delete subject {{ s.name }}? This cannot be undone.')">
+                  <input type="hidden" name="force" value="0"/>
+                  <button type="submit" class="btn btn-ghost btn-sm" title="Delete">
+                    <i class="fas fa-trash" style="color:var(--red)"></i> Delete
+                  </button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('delete_subject', sid=s.id) }}" onsubmit="return confirm('WARNING: Force deleting {{ s.name }} will permanently erase {{ item.sessions }} session(s) and ALL their attendance records. This cannot be undone. Continue?')">
+                  <input type="hidden" name="force" value="1"/>
+                  <button type="submit" class="btn btn-ghost btn-sm" title="Force delete subject and all its sessions">
+                    <i class="fas fa-trash-can" style="color:var(--red)"></i> Force Delete
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="empty-state card" style="padding:60px;">
+  <i class="fas fa-book-open"></i>
+  <p>No subjects yet. They are created automatically when a class session is started.</p>
+</div>
+{% endif %}
+
+<!-- MERGE MODAL -->
+<div id="merge-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)closeMerge()">
+  <div style="background:var(--panel);border:1px solid var(--border2);border-radius:var(--r-xl);padding:32px;max-width:440px;width:90%;box-shadow:var(--shadow-lg);">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px;">Merge Subject</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;">All sessions from <strong id="merge-from-name" style="color:var(--accent-h)"></strong> will be moved into the target subject, then the source is deleted.</div>
+    <form id="merge-form" method="POST">
+      <div class="form-group">
+        <label class="form-label">MERGE INTO</label>
+        <select name="target_id" id="merge-target" class="form-control" required>
+          <option value="">Select target subject...</option>
+          {% for item in subjects %}
+          <option value="{{ item.subject.id }}" data-year="{{ item.subject.year }}" data-branch="{{ item.subject.branch }}">
+            {{ item.subject.name|title }} ({{ item.subject.year }} · {{ item.subject.branch }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button type="button" onclick="closeMerge()" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex:1">
+          <i class="fas fa-code-merge"></i> Merge
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var currentMergeId = null;
+
+function startRename(id) {
+  document.getElementById('view-' + id).style.display = 'none';
+  document.getElementById('rename-form-' + id).style.display = 'block';
+}
+function cancelRename(id) {
+  document.getElementById('view-' + id).style.display = 'flex';
+  document.getElementById('rename-form-' + id).style.display = 'none';
+}
+function openMerge(id, name, year, branch) {
+  currentMergeId = id;
+  document.getElementById('merge-from-name').textContent = name;
+  // Filter out self from target options
+  var select = document.getElementById('merge-target');
+  Array.from(select.options).forEach(opt => {
+    opt.disabled = (opt.value === String(id) || opt.value === '');
+    if (opt.value === String(id)) opt.selected = false;
+  });
+  document.getElementById('merge-form').action = '/admin/subject/' + id + '/merge';
+  document.getElementById('merge-modal').style.display = 'flex';
+}
+function closeMerge() {
+  document.getElementById('merge-modal').style.display = 'none';
+}
+</script>
+{% endblock %}
