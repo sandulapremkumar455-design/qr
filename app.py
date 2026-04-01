@@ -25,7 +25,10 @@ from email.mime.multipart import MIMEMultipart
 # ─────────────────────────────────────────────
 # APP CONFIG
 # ─────────────────────────────────────────────
-
+@app.route('/initdb-secret-123')
+def initdb():
+    db.create_all()
+    return "Tables created!"
 app = Flask(__name__)
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
