@@ -236,6 +236,11 @@ class LoginAttempt(db.Model):
     ip_address = db.Column(db.String(64), nullable=True)
     success    = db.Column(db.Boolean, default=False)
     timestamp  = db.Column(db.DateTime, default=datetime.utcnow)
+  # ─────────────────────────────────────────────
+# CREATE TABLES
+# ─────────────────────────────────────────────
+with app.app_context():
+    db.create_all()
 
 
 # ─────────────────────────────────────────────
