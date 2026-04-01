@@ -241,6 +241,16 @@ class LoginAttempt(db.Model):
 # ─────────────────────────────────────────────
 with app.app_context():
     db.create_all()
+  # Seed admin
+    if not User.query.filter_by(pin='admin').first():
+        from werkzeug.security import generate_password_hash
+        admin = User(
+            pin='admin', name='Administrator',
+            password=generate_password_hash('admin123'),
+            role='admin', year=None, branch=None
+        )
+        db.session.add(admin)
+        db.session.commit()
 
 
 # ─────────────────────────────────────────────
