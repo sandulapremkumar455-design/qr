@@ -901,9 +901,17 @@ def stop_session(session_id):
         return jsonify({'error': 'Forbidden'}), 403
     sess = ClassSession.query.get_or_404(session_id)
     sess.is_active = False
+    sess.is_active = False
     sess.expires_at = datetime.utcnow()
     db.session.commit()
+
+    # Delete QR image file
+    qr_path = f'static/qr/qr_{session_id}.png'
+    if os.path.exists(qr_path):
+        os.remove(qr_path)
+
     return jsonify({'success': True})
+  
 
 
 @app.route('/admin/students')
