@@ -84,7 +84,7 @@
       position: fixed; inset: 0;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
       pointer-events: none;
-      z-index: 9998;
+      z-index: -1;
       opacity: 0.5;
     }
 
@@ -745,6 +745,16 @@
     .toast.warning { border-left: 3px solid var(--amber); }
     .toast.info    { border-left: 3px solid var(--accent); }
 
+    /* ─── SIDEBAR BACKDROP ─── */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 99;
+    }
+    .sidebar-backdrop.open { display: block; }
+
     /* ─── RESPONSIVE ─── */
     @media (max-width: 768px) {
       :root { --sidebar-w: 0px; }
@@ -793,6 +803,7 @@
 <div class="app-layout">
 
   <!-- SIDEBAR -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-text" style="font-size:20px;letter-spacing:2px;line-height:1.2">Smart<br>Attendance</div>
@@ -807,6 +818,9 @@
           {% if current_user.role == 'student' %}· {{ current_user.year }} {{ current_user.branch }}{% endif %}
         </div>
       </div>
+      <a href="{{ url_for('logout') }}" style="margin-left:auto;color:var(--text3);text-decoration:none;font-size:16px;flex-shrink:0;" title="Sign Out">
+        <i class="fas fa-right-from-bracket"></i>
+      </a>
     </div>
 
     <nav class="sidebar-nav">
@@ -880,17 +894,12 @@
       {% endif %}
     </nav>
 
-    <div class="sidebar-footer">
-      <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-full btn-sm">
-        <i class="fas fa-right-from-bracket"></i> Sign Out
-      </a>
-    </div>
   </aside>
 
   <!-- MAIN -->
   <main class="main-content">
     <header class="topbar">
-      <button class="btn btn-ghost btn-icon" id="menu-toggle" style="display:none" onclick="document.getElementById('sidebar').classList.toggle('open')">
+      <button class="btn btn-ghost btn-icon" id="menu-toggle" style="display:none">
         <i class="fas fa-bars"></i>
       </button>
       <div class="topbar-title">{% block page_title %}{% endblock %}</div>
@@ -989,7 +998,7 @@ setInterval(fetchNotifications, 30000);
 // ─── AUTO-LOGOUT FOR STUDENTS (1 hour) ───
 {% if current_user.is_authenticated and current_user.role == 'student' %}
 (function() {
-  var SESSION_DURATION = 60 * 60 * 1000; // 1 hour in ms
+  var SESSION_DURATION = 60 * 60 * 1000;
   var KEY = 'student_login_time';
   var loginTime = sessionStorage.getItem(KEY);
   if (!loginTime) {
@@ -1032,6 +1041,23 @@ function checkWidth() {
 }
 window.addEventListener('resize', checkWidth);
 checkWidth();
+
+const _sidebar = document.getElementById('sidebar');
+const _backdrop = document.getElementById('sidebarBackdrop');
+const _menuBtn = document.getElementById('menu-toggle');
+
+if (_menuBtn) {
+  _menuBtn.onclick = function() {
+    _sidebar.classList.toggle('open');
+    _backdrop.classList.toggle('open');
+  };
+}
+if (_backdrop) {
+  _backdrop.addEventListener('click', function() {
+    _sidebar.classList.remove('open');
+    _backdrop.classList.remove('open');
+  });
+}
 
 // ─── PROGRESS BARS ANIMATE ON LOAD ───
 document.addEventListener('DOMContentLoaded', () => {
